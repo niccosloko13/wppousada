@@ -1,10 +1,24 @@
 require('dotenv').config();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
-const { executablePath } = require('puppeteer');
-const readline = require('readline');
+const puppeteer = require('puppeteer');
+const QRCode = require('qrcode');
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Servir arquivos da pasta public
+app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+  res.send('Bot da Pousada rodando! Escaneie o QR code em /qrcode.png');
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Servidor Express rodando na porta ${PORT}`);
+});
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -14,138 +28,55 @@ const client = new Client({
   }
 });
 
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
-const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 let atendimentoLiberado = false;
-const bufferMensagens = {};
-const delayResposta = 4000;
 
-client.on('qr', qr => {
-  console.log('📸 Escaneie o QR Code abaixo para conectar no WhatsApp:');
-  qrcode.generate(qr, { small: false });
+// Criar pasta public se não existir
+if (!fs.existsSync('./public')) {
+  fs.mkdirSync('./public');
+}
+
+client.on('qr', async (qr) => {
+  console.log('📸 Gerando QR Code, aguarde...');
+
+  await QRCode.toFile('./public/qrcode.png', qr, {
+    color: {
+      dark: '#000',
+      light: '#FFF'
+    }
+  });
+
+  console.log('✅ QR Code gerado! Abra: /qrcode.png no navegador!');
 });
 
 client.on('ready', () => {
-  console.log('✅ WhatsApp conectado e pronto!');
+  console.log('✅ WhatsApp conectado e pronto para atendimento!');
   atendimentoLiberado = true;
 });
 
 client.on('message', async (msg) => {
   if (!atendimentoLiberado || !msg.from.includes('@c.us')) return;
 
-  const cliente = msg.from;
-  const textoCorrigido = corrigirTexto(msg.body.toLowerCase());
+  const texto = msg.body.toLowerCase();
+  console.log(`📞 Mensagem de ${msg.from}: ${texto}`);
 
-  console.log(`📞 [${cliente}] -> ${textoCorrigido}`);
-
-  if (!bufferMensagens[cliente]) {
-    bufferMensagens[cliente] = [];
+  if (texto.includes('foto')) {
+    await msg.reply('📸 Te envio fotos da pousada agora!');
+    // (Aqui seu código de envio das fotos pousada1.jpeg até pousada10.jpeg)
+    return;
   }
-  bufferMensagens[cliente].push(textoCorrigido);
 
-  setTimeout(async () => {
-    const mensagensCliente = bufferMensagens[cliente] || [];
-    const textoCompleto = mensagensCliente.join(' ').trim();
-    bufferMensagens[cliente] = [];
+  if (texto.includes('localização') || texto.includes('onde fica')) {
+    await msg.reply('📍 Estamos na Ilha Comprida/SP, bairro Pedrinhas! 🌴 Veja o mapa: https://maps.app.goo.gl/kk4wWxqcqm7cx5tm8');
+    return;
+  }
 
-    if (!textoCompleto) return;
-    const chat = await msg.getChat();
+  if (texto.includes('valor') || texto.includes('preço') || texto.includes('diária')) {
+    await msg.reply('🏡 Diária adultos: R$125 | Crianças (8 a 12 anos): R$70. Incluso: café da manhã, ar-condicionado, TV Smart, frigobar, mini cozinha e banheiro privativo.');
+    return;
+  }
 
-    const simularDigitando = async (tempo = 2000) => {
-      await chat.sendStateTyping();
-      await esperar(tempo);
-      await chat.clearState();
-    };
-
-    const enviarMensagem = async (mensagem) => {
-      const partes = mensagem.match(/(.|[\r\n]){1,380}/g);
-      for (const parte of partes) {
-        await simularDigitando(1800);
-        await msg.reply(parte.trim());
-        await esperar(1500);
-      }
-    };
-
-    if (textoCompleto.includes('pet') || textoCompleto.includes('animal') || textoCompleto.includes('cachorro') || textoCompleto.includes('gato')) {
-      await simularDigitando(1800);
-      await msg.reply('🐾 Aceitamos pets de pequeno porte na pousada! 😄');
-      return;
-    }
-
-    if (msg.hasMedia && msg.type === 'audio') {
-      await simularDigitando(1500);
-      await msg.reply('📢 Desculpe, no momento não consigo ouvir áudios. Poderia digitar sua mensagem, por favor? 😄');
-      return;
-    }
-
-    if (textoCompleto.includes('foto') || textoCompleto.includes('fotos') || textoCompleto.includes('imagem')) {
-      await simularDigitando(2000);
-      await msg.reply('📸 Claro! Vou te mandar algumas fotos da pousada! 😄');
-      for (let i = 1; i <= 10; i++) {
-        try {
-          await esperar(700);
-          const media = MessageMedia.fromFilePath(`./pousada${i}.jpeg`);
-          await client.sendMessage(msg.from, media);
-        } catch (err) {
-          console.error(`Erro ao enviar pousada${i}.jpeg:`, err.message);
-        }
-      }
-      await simularDigitando(2000);
-      await msg.reply('✨ Mais fotos no Instagram: https://www.instagram.com/pousadaparaisodaspedrinhas');
-      return;
-    }
-
-    if (textoCompleto.includes('localização') || textoCompleto.includes('onde fica') || textoCompleto.includes('como chegar') || textoCompleto.includes('mapa')) {
-      await simularDigitando(1800);
-      await msg.reply('📍 Estamos na Ilha Comprida/SP, bairro Pedrinhas! 🌴 Aqui está o mapa: https://maps.app.goo.gl/kk4wWxqcqm7cx5tm8');
-      return;
-    }
-
-    if (textoCompleto.includes('vaga') || textoCompleto.includes('disponível') || textoCompleto.includes('disponibilidade')) {
-      await simularDigitando(1800);
-      await msg.reply('😄 Vamos verificar a disponibilidade!\n\nPode me confirmar:\n- Data de entrada e saída\n- Quantos adultos e crianças virão? 🏡✨');
-      return;
-    }
-
-    if (textoCompleto.includes('quanto') || textoCompleto.includes('valor') || textoCompleto.includes('preço') || textoCompleto.includes('diária')) {
-      await simularDigitando(1800);
-      await msg.reply('🏡 Diária adultos: R$125\nCrianças (8-12 anos): R$70\nIncluso: café da manhã, ar-condicionado, TV Smart, frigobar, mini cozinha equipada e banheiro privativo.\n\nQuer que eu reserve pra você? 😄🏡');
-      return;
-    }
-
-    if (textoCompleto.includes('vou ver') || textoCompleto.includes('depois vejo') || textoCompleto.includes('não sei ainda') || textoCompleto.includes('talvez')) {
-      await simularDigitando(1800);
-      await msg.reply('😄 Sem problema! Quando decidir, estarei aqui para garantir sua reserva! 🏡✨');
-      return;
-    }
-
-    if (textoCompleto.includes('oi') || textoCompleto.includes('olá') || textoCompleto.includes('bom dia') || textoCompleto.includes('boa tarde') || textoCompleto.includes('boa noite')) {
-      await simularDigitando(1500);
-      await msg.reply('Oi! 👋 Seja bem-vindo(a) à Pousada Paraíso das Pedrinhas! 🏡✨ Posso te ajudar a encontrar a melhor data para sua estadia? 😄');
-      return;
-    }
-
-    await simularDigitando(1800);
-    await msg.reply('😅 Desculpe, não entendi direitinho. Pode repetir, por favor? 🙏🏡');
-  }, delayResposta);
+  await msg.reply('😄 Estou aqui para te ajudar! Pergunte sobre reservas, localização ou fotos!');
 });
-
-function corrigirTexto(texto) {
-  return texto
-    .replace(/fotus|fottos|fottus|fotis/gi, 'fotos')
-    .replace(/pouzada|posada/gi, 'pousada')
-    .replace(/diaria|diárias/gi, 'diária')
-    .replace(/fik|fica|fikr/gi, 'fica')
-    .replace(/keru|ker|quero/gi, 'quero')
-    .replace(/be|ve|vê/gi, 'ver')
-    .replace(/localisacao|localização|locau/gi, 'localização');
-}
 
 (async () => {
   try {

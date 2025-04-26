@@ -1,15 +1,16 @@
 {
-  "name": "whatsapp-ai-bot",
+  "name": "chatbot-pousada",
   "version": "1.0.0",
-  "description": "Bot de WhatsApp com ChatGPT integrado",
+  "description": "Chatbot Pousada Paraíso das Pedrinhas - Online 24h",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
-    "dotenv": "^16.5.0",
-    "openai": "^4.96.0",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.27.0"
+    "whatsapp-web.js": "^1.23.0",
+    "puppeteer": "^19.6.0",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.1"
   }
 }
