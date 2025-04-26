@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
-const OpenAI = require('openai');
+const axios = require('axios');
 const puppeteer = require('puppeteer');
 const readline = require('readline');
 const fs = require('fs');
@@ -8,26 +8,22 @@ const path = require('path');
 const express = require('express');
 const QRCode = require('qrcode');
 
-// Configuração do Express para servir o QR
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(express.static('public'));
 
 app.get('/', (req, res) => {
-  res.send('✅ Bot rodando! Escaneie o QR em /qrcode.png');
+  res.send('✅ Bot rodando! Acesse /qrcode.png para escanear.');
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Servidor Express iniciado na porta ${PORT}`);
-});
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  console.log(`🌐 Servidor Express rodando na porta ${PORT}`);
 });
 
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
+    executablePath: puppeteer.executablePath(),
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   }
@@ -51,7 +47,7 @@ if (!fs.existsSync('./public')) {
 }
 
 client.on('qr', async (qr) => {
-  console.log('📸 Gerando QR Code, aguarde...');
+  console.log('📸 Gerando QR Code...');
   try {
     await QRCode.toFile('./public/qrcode.png', qr, {
       color: {
@@ -73,20 +69,79 @@ client.on('ready', () => {
   });
 });
 
-// --- TODA SUA LÓGICA DE MENSAGENS AQUI (NÃO ALTEREI) ---
 client.on('message', async (msg) => {
   if (!atendimentoLiberado) return;
   if (!msg.from.includes('@c.us')) return;
 
   console.log(`📞 Mensagem recebida de ${msg.from}: ${msg.body}`);
+
   const texto = msg.body.toLowerCase();
 
-  // [Toda sua lógica de resposta está aqui, exatamente igual você mandou]
-  // [Não mudei NADA nas respostas e nos atendimentos]
-  // ...
+  // Atendimento especial
+  if (texto.includes('pet') || texto.includes('animal') || texto.includes('cachorro') || texto.includes('gato')) {
+    await msg.reply('🐾 Aceitamos pets de pequeno porte na pousada! 😄');
+    return;
+  }
+
+  if (msg.hasMedia && msg.type === 'audio') {
+    await msg.reply('📢 No momento não consigo ouvir áudios. Por favor, digite sua mensagem! 😄');
+    return;
+  }
+
+  if (palavrasDeFoto.some(p => texto.includes(p))) {
+    await msg.reply('📸 Claro! Vou te mandar algumas fotos da pousada! 😄');
+    for (let i = 1; i <= 10; i++) {
+      try {
+        const media = MessageMedia.fromFilePath(`./pousada${i}.jpeg`);
+        await client.sendMessage(msg.from, media);
+      } catch (err) {
+        console.error(`Erro ao enviar pousada${i}.jpeg:`, err.message);
+      }
+    }
+    await msg.reply('✨ Veja mais no Instagram: https://www.instagram.com/pousadaparaisodaspedrinhas');
+    return;
+  }
+
+  if (palavrasLocalizacao.some(p => texto.includes(p))) {
+    await msg.reply('📍 Estamos na Ilha Comprida/SP, bairro Pedrinhas! 🌴 Mapa: https://maps.app.goo.gl/kk4wWxqcqm7cx5tm8');
+    return;
+  }
+
+  if (saudacoes.some(p => texto.includes(p))) {
+    await msg.reply('Oi! 👋 Seja bem-vindo(a) à Pousada Paraíso das Pedrinhas! 🏡✨');
+    return;
+  }
+
+  if (respostaDeDuvida.some(p => texto.includes(p))) {
+    await msg.reply('😄 Sem problema! Quando decidirem, estarei por aqui para garantir sua reserva! 🏡✨');
+    return;
+  }
+
+  // Caso nada bater, consulta a IA
+  const respostaIA = await gerarRespostaDoCliente(texto);
+  await msg.reply(respostaIA);
 });
 
-// Inicializa o bot
+// Função pra consultar OpenAI via Axios
+async function gerarRespostaDoCliente(texto) {
+  try {
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: texto }]
+    }, {
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    return response.data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('❌ Erro ao conversar com a IA:', error.response?.data || error.message);
+    return "Desculpe, não entendi muito bem. Pode repetir, por favor?";
+  }
+}
+
 (async () => {
   try {
     await client.initialize();
