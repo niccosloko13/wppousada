@@ -1,7 +1,7 @@
 {
   "name": "chatbot-pousada",
   "version": "1.0.0",
-  "description": "Chatbot Pousada Paraíso das Pedrinhas - Online 24h",
+  "description": "Chatbot Pousada Paraíso das Pedrinhas",
   "main": "app.js",
   "scripts": {
     "start": "node app.js"
@@ -11,6 +11,7 @@
     "puppeteer": "^19.6.0",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "qrcode": "^1.5.1"
+    "qrcode": "^1.5.1",
+    "openai": "^4.0.0"    
   }
 }
