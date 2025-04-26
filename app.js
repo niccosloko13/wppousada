@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const axios = require('axios');
 const puppeteer = require('puppeteer');
+const { executablePath } = require('puppeteer');
 const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
@@ -23,9 +24,18 @@ app.listen(PORT, () => {
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
-    executablePath: puppeteer.executablePath(),
+    executablePath: executablePath(),
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ]
   }
 });
 
@@ -77,7 +87,6 @@ client.on('message', async (msg) => {
 
   const texto = msg.body.toLowerCase();
 
-  // Atendimento especial
   if (texto.includes('pet') || texto.includes('animal') || texto.includes('cachorro') || texto.includes('gato')) {
     await msg.reply('🐾 Aceitamos pets de pequeno porte na pousada! 😄');
     return;
@@ -117,12 +126,10 @@ client.on('message', async (msg) => {
     return;
   }
 
-  // Caso nada bater, consulta a IA
   const respostaIA = await gerarRespostaDoCliente(texto);
   await msg.reply(respostaIA);
 });
 
-// Função pra consultar OpenAI via Axios
 async function gerarRespostaDoCliente(texto) {
   try {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
