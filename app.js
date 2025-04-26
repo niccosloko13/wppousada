@@ -28,7 +28,7 @@ const delayResposta = 4000;
 
 client.on('qr', qr => {
   console.log('📸 Escaneie o QR Code abaixo para conectar no WhatsApp:');
-  qrcode.generate(qr, { small: true });
+  qrcode.generate(qr, { small: false });
 });
 
 client.on('ready', () => {
