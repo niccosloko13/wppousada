@@ -9,11 +9,11 @@ const path = require('path');
 const client = new Client({
   authStrategy: new LocalAuth(),
   puppeteer: {
-    executablePath: executablePath(),
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   }
 });
+
 
 const rl = readline.createInterface({
   input: process.stdin,
